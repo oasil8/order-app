@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function MenuCard({ menu, isExpanded, onToggle, onAddToCart }) {
   const [selectedOptions, setSelectedOptions] = useState([])
+
+  useEffect(() => {
+    if (!isExpanded) setSelectedOptions([])
+  }, [isExpanded])
 
   function toggleOption(option) {
     setSelectedOptions(prev =>
@@ -14,12 +18,10 @@ export default function MenuCard({ menu, isExpanded, onToggle, onAddToCart }) {
   function handleAdd(e) {
     e.stopPropagation()
     onAddToCart(selectedOptions)
-    setSelectedOptions([])
   }
 
   function handleClose(e) {
     e.stopPropagation()
-    setSelectedOptions([])
     onToggle()
   }
 

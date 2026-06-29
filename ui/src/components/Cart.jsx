@@ -1,5 +1,9 @@
-export default function Cart({ cartItems, onChangeQuantity, onRemove, onOrder }) {
+export default function Cart({ cartItems, stockMap = {}, onChangeQuantity, onRemove, onOrder }) {
   const total = cartItems.reduce((sum, item) => sum + item.subtotal, 0)
+  const totalByMenuId = cartItems.reduce((acc, item) => {
+    acc[item.menuId] = (acc[item.menuId] || 0) + item.quantity
+    return acc
+  }, {})
 
   return (
     <div className="cart">
@@ -20,7 +24,11 @@ export default function Cart({ cartItems, onChangeQuantity, onRemove, onOrder })
                 <div className="cart-item-controls">
                   <button className="qty-btn" onClick={() => onChangeQuantity(item.key, -1)}>−</button>
                   <span className="qty-count">{item.quantity}</span>
-                  <button className="qty-btn" onClick={() => onChangeQuantity(item.key, 1)}>+</button>
+                  <button
+                    className="qty-btn"
+                    onClick={() => onChangeQuantity(item.key, 1)}
+                    disabled={totalByMenuId[item.menuId] >= (stockMap[item.menuId] ?? Infinity)}
+                  >+</button>
                   <span className="cart-item-price">{item.subtotal.toLocaleString()}원</span>
                   <button className="remove-btn" onClick={() => onRemove(item.key)}>×</button>
                 </div>

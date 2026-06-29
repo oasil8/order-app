@@ -1,40 +1,3 @@
-import { useState } from 'react'
-
-const INITIAL_STOCK = [
-  { id: 1, name: '아메리카노(ICE)', quantity: 10 },
-  { id: 2, name: '아메리카노(HOT)', quantity: 10 },
-  { id: 3, name: '카페라떼', quantity: 3 },
-  { id: 4, name: '카푸치노', quantity: 0 },
-  { id: 5, name: '바닐라라떼', quantity: 7 },
-]
-
-const INITIAL_ORDERS = [
-  {
-    id: 1,
-    createdAt: new Date(2026, 5, 29, 13, 0),
-    items: [{ name: '아메리카노(ICE)', options: [], qty: 1 }],
-    total: 4000,
-    status: '주문 접수',
-  },
-  {
-    id: 2,
-    createdAt: new Date(2026, 5, 29, 12, 45),
-    items: [
-      { name: '카페라떼', options: ['샷 추가'], qty: 2 },
-      { name: '아메리카노(HOT)', options: [], qty: 1 },
-    ],
-    total: 14000,
-    status: '제조 중',
-  },
-  {
-    id: 3,
-    createdAt: new Date(2026, 5, 29, 12, 30),
-    items: [{ name: '바닐라라떼', options: [], qty: 1 }],
-    total: 5500,
-    status: '제조 완료',
-  },
-]
-
 function formatDate(date) {
   const month = date.getMonth() + 1
   const day = date.getDate()
@@ -49,34 +12,14 @@ function stockStatus(qty) {
   return { label: '정상', cls: 'badge-ok' }
 }
 
-const ORDER_NEXT = { '주문 접수': '제조 중', '제조 중': '제조 완료' }
-const ORDER_BTN  = { '주문 접수': '제조 시작', '제조 중': '제조 완료' }
+const ORDER_BTN = { '주문 접수': '제조 시작', '제조 중': '제조 완료 처리' }
 
-export default function AdminPage() {
-  const [stock, setStock]   = useState(INITIAL_STOCK)
-  const [orders, setOrders] = useState(INITIAL_ORDERS)
-
+export default function AdminPage({ menus, orders, onChangeStock, onAdvanceOrder }) {
   const summary = {
     total:    orders.length,
     received: orders.filter(o => o.status === '주문 접수').length,
     making:   orders.filter(o => o.status === '제조 중').length,
     done:     orders.filter(o => o.status === '제조 완료').length,
-  }
-
-  function changeStock(id, delta) {
-    setStock(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
-      )
-    )
-  }
-
-  function advanceOrder(id) {
-    setOrders(prev =>
-      prev.map(order =>
-        order.id === id ? { ...order, status: ORDER_NEXT[order.status] } : order
-      )
-    )
   }
 
   return (
@@ -104,18 +47,18 @@ export default function AdminPage() {
       <section className="admin-section">
         <h2 className="section-title">재고 현황</h2>
         <div className="stock-grid">
-          {stock.map(item => {
-            const { label, cls } = stockStatus(item.quantity)
+          {menus.map(item => {
+            const { label, cls } = stockStatus(item.stock)
             return (
               <div key={item.id} className="stock-card">
                 <span className="stock-name">{item.name}</span>
                 <div className="stock-row">
-                  <span className="stock-qty">{item.quantity}개</span>
+                  <span className="stock-qty">{item.stock}개</span>
                   <span className={`stock-badge ${cls}`}>{label}</span>
                 </div>
                 <div className="stock-controls">
-                  <button className="qty-btn" onClick={() => changeStock(item.id, 1)}>+</button>
-                  <button className="qty-btn" onClick={() => changeStock(item.id, -1)} disabled={item.quantity === 0}>−</button>
+                  <button className="qty-btn" onClick={() => onChangeStock(item.id, 1)}>+</button>
+                  <button className="qty-btn" onClick={() => onChangeStock(item.id, -1)} disabled={item.stock === 0}>−</button>
                 </div>
               </div>
             )
@@ -136,17 +79,16 @@ export default function AdminPage() {
                 <li key={order.id} className="order-row">
                   <span className="order-date">{formatDate(order.createdAt)}</span>
                   <span className="order-items">
-                    {order.items.map((it, i) => (
-                      <span key={i}>
+                    {order.items.map(it => (
+                      <span key={`${it.name}|${it.options.join(',')}`}>
                         {it.name}{it.options.length > 0 ? ` (${it.options.join(', ')})` : ''} x {it.qty}
-                        {i < order.items.length - 1 && ',  '}
                       </span>
                     ))}
                   </span>
                   <span className="order-total">{order.total.toLocaleString()}원</span>
                   <div className="order-action">
                     {btnLabel ? (
-                      <button className="btn-primary btn-sm" onClick={() => advanceOrder(order.id)}>
+                      <button className="btn-primary btn-sm" onClick={() => onAdvanceOrder(order.id)}>
                         {btnLabel}
                       </button>
                     ) : (
