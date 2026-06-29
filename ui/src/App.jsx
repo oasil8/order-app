@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Header from './components/Header'
 import OrderPage from './components/OrderPage'
+import AdminPage from './components/AdminPage'
 import './App.css'
 
 function App() {
@@ -10,11 +11,7 @@ function App() {
     <div className="app">
       <Header currentPage={page} onNavigate={setPage} />
       {page === 'order' && <OrderPage />}
-      {page === 'admin' && (
-        <main className="page-content">
-          <p>관리자 화면 (준비 중)</p>
-        </main>
-      )}
+      {page === 'admin' && <AdminPage />}
     </div>
   )
 }
