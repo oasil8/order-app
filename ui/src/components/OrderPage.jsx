@@ -21,9 +21,13 @@ export default function OrderPage({ menus, cart, onAddToCart, onChangeQuantity, 
     setExpandedId(null)
   }
 
-  function handleOrder() {
-    onOrder()
-    setToast(true)
+  async function handleOrder() {
+    try {
+      await onOrder()
+      setToast(true)
+    } catch (err) {
+      console.error('주문 실패:', err)
+    }
   }
 
   const stockMap = Object.fromEntries(menus.map(m => [m.id, m.stock]))

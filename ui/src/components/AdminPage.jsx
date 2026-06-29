@@ -1,4 +1,8 @@
-function formatDate(date) {
+import { useState, useEffect } from 'react'
+import { fetchOrders, updateOrderStatus } from '../api'
+
+function formatDate(dateStr) {
+  const date = new Date(dateStr)
   const month = date.getMonth() + 1
   const day = date.getDate()
   const hh = String(date.getHours()).padStart(2, '0')
@@ -12,9 +16,31 @@ function stockStatus(qty) {
   return { label: '정상', cls: 'badge-ok' }
 }
 
-const ORDER_BTN = { '주문 접수': '제조 시작', '제조 중': '제조 완료 처리' }
+const ORDER_NEXT = { '주문 접수': '제조 중', '제조 중': '제조 완료' }
+const ORDER_BTN  = { '주문 접수': '제조 시작', '제조 중': '제조 완료 처리' }
 
-export default function AdminPage({ menus, orders, onChangeStock, onAdvanceOrder }) {
+export default function AdminPage({ menus, onChangeStock }) {
+  const [orders, setOrders] = useState([])
+  const [ordersLoading, setOrdersLoading] = useState(true)
+
+  useEffect(() => {
+    fetchOrders()
+      .then(setOrders)
+      .catch(console.error)
+      .finally(() => setOrdersLoading(false))
+  }, [])
+
+  async function handleAdvanceOrder(id, currentStatus) {
+    const nextStatus = ORDER_NEXT[currentStatus]
+    if (!nextStatus) return
+    try {
+      await updateOrderStatus(id, nextStatus)
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: nextStatus } : o))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const summary = {
     total:    orders.length,
     received: orders.filter(o => o.status === '주문 접수').length,
@@ -69,7 +95,9 @@ export default function AdminPage({ menus, orders, onChangeStock, onAdvanceOrder
       {/* 주문 현황 */}
       <section className="admin-section">
         <h2 className="section-title">주문 현황</h2>
-        {orders.length === 0 ? (
+        {ordersLoading ? (
+          <p className="empty-msg">주문을 불러오는 중...</p>
+        ) : orders.length === 0 ? (
           <p className="empty-msg">접수된 주문이 없습니다.</p>
         ) : (
           <ul className="order-list">
@@ -77,18 +105,21 @@ export default function AdminPage({ menus, orders, onChangeStock, onAdvanceOrder
               const btnLabel = ORDER_BTN[order.status]
               return (
                 <li key={order.id} className="order-row">
-                  <span className="order-date">{formatDate(order.createdAt)}</span>
+                  <span className="order-date">{formatDate(order.created_at)}</span>
                   <span className="order-items">
-                    {order.items.map(it => (
-                      <span key={`${it.name}|${it.options.join(',')}`}>
-                        {it.name}{it.options.length > 0 ? ` (${it.options.join(', ')})` : ''} x {it.qty}
+                    {order.items.map((it, i) => (
+                      <span key={it.id}>
+                        {it.menu_name}
+                        {it.options.length > 0 ? ` (${it.options.join(', ')})` : ''}
+                        {' '}x {it.quantity}
+                        {i < order.items.length - 1 ? ',  ' : ''}
                       </span>
                     ))}
                   </span>
-                  <span className="order-total">{order.total.toLocaleString()}원</span>
+                  <span className="order-total">{order.total_price.toLocaleString()}원</span>
                   <div className="order-action">
                     {btnLabel ? (
-                      <button className="btn-primary btn-sm" onClick={() => onAdvanceOrder(order.id)}>
+                      <button className="btn-primary btn-sm" onClick={() => handleAdvanceOrder(order.id, order.status)}>
                         {btnLabel}
                       </button>
                     ) : (

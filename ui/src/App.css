@@ -1,3 +1,17 @@
+/* Loading / Error */
+.page-status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60vh;
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.page-status.error {
+  color: #dc2626;
+}
+
 /* Toast */
 .toast {
   position: fixed;
