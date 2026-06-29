@@ -33,7 +33,11 @@ export default function MenuCard({ menu, isExpanded, onToggle, onAddToCart }) {
       className={`menu-card ${menu.stock === 0 ? 'out-of-stock' : ''}`}
       onClick={!isExpanded && menu.stock > 0 ? onToggle : undefined}
     >
-      <div className="menu-image">{menu.emoji}</div>
+      <div className="menu-image">
+        {menu.imageUrl
+          ? <img src={menu.imageUrl} alt={menu.name} />
+          : menu.emoji}
+      </div>
       <div className="menu-info">
         <strong className="menu-name">{menu.name}</strong>
         <span className="menu-price">{displayPrice}원</span>

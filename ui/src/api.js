@@ -21,6 +21,7 @@ export async function fetchMenus() {
     price: menu.price,
     stock: menu.stock,
     emoji: getEmoji(menu.name),
+    imageUrl: menu.image_url,
     options: menu.options.map(opt => ({
       id: opt.id,
       label: opt.name,
