@@ -234,3 +234,206 @@
 | 제조 완료 상태에서 상태 변경 시도 | 버튼 비활성화 |
 | 서버 오류로 상태/재고 변경 실패 | 오류 메시지 표시, 이전 값으로 UI 복원 |
 | 주문이 없는 경우 | 주문 현황 영역에 "접수된 주문이 없습니다" 표시 |
+
+
+---
+
+
+## 5. 백엔드 PRD
+
+
+### 5.1 데이터 모델
+
+
+#### 5.1.1 Menus (메뉴)
+
+커피 메뉴 정보를 저장하는 테이블
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL PRIMARY KEY | 메뉴 고유 ID |
+| name | VARCHAR(100) NOT NULL | 메뉴 이름 (예: 아메리카노(ICE)) |
+| description | TEXT | 메뉴 설명 |
+| price | INTEGER NOT NULL | 기본 가격 (원 단위 정수) |
+| image_url | VARCHAR(255) | 메뉴 이미지 URL |
+| stock | INTEGER NOT NULL DEFAULT 0 | 현재 재고 수량 (0 이상) |
+| created_at | TIMESTAMP DEFAULT NOW() | 생성 일시 |
+
+
+#### 5.1.2 Options (옵션)
+
+메뉴에 추가 가능한 옵션 정보를 저장하는 테이블
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL PRIMARY KEY | 옵션 고유 ID |
+| menu_id | INTEGER REFERENCES menus(id) | 연결된 메뉴 ID (외래 키) |
+| name | VARCHAR(100) NOT NULL | 옵션 이름 (예: 샷 추가) |
+| price | INTEGER NOT NULL DEFAULT 0 | 옵션 추가 금액 (원 단위 정수) |
+
+
+#### 5.1.3 Orders (주문)
+
+고객이 완료한 주문 정보를 저장하는 테이블
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL PRIMARY KEY | 주문 고유 ID |
+| total_price | INTEGER NOT NULL | 주문 총 금액 |
+| status | VARCHAR(20) NOT NULL DEFAULT '주문 접수' | 주문 상태 (주문 접수 / 제조 중 / 제조 완료) |
+| created_at | TIMESTAMP DEFAULT NOW() | 주문 일시 |
+
+
+#### 5.1.4 Order_Items (주문 항목)
+
+주문에 포함된 개별 메뉴 항목을 저장하는 테이블
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL PRIMARY KEY | 항목 고유 ID |
+| order_id | INTEGER REFERENCES orders(id) | 연결된 주문 ID (외래 키) |
+| menu_id | INTEGER REFERENCES menus(id) | 주문된 메뉴 ID (외래 키) |
+| quantity | INTEGER NOT NULL | 주문 수량 |
+| item_price | INTEGER NOT NULL | 항목 단가 (기본 가격 + 옵션 가격) |
+
+
+#### 5.1.5 Order_Item_Options (주문 항목 옵션)
+
+주문 항목에 선택된 옵션을 저장하는 테이블
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL PRIMARY KEY | 고유 ID |
+| order_item_id | INTEGER REFERENCES order_items(id) | 연결된 주문 항목 ID (외래 키) |
+| option_id | INTEGER REFERENCES options(id) | 선택된 옵션 ID (외래 키) |
+
+
+#### 5.1.6 테이블 관계
+
+```
+menus ──< options
+menus ──< order_items >── orders
+order_items ──< order_item_options >── options
+```
+
+
+### 5.2 사용자 흐름과 데이터 연동
+
+| 단계 | 사용자 행동 | 데이터 흐름 |
+|------|------------|------------|
+| ① | 주문하기 화면 진입 | Menus + Options 조회 → 메뉴 카드 표시 (재고 수량은 관리자 화면 전용) |
+| ② | 메뉴 선택 및 옵션 체크 후 담기 | 클라이언트 장바구니 상태에 저장 (서버 미전송) |
+| ③ | 주문하기 버튼 클릭 | Orders + Order_Items + Order_Item_Options 생성, Menus 재고 차감 |
+| ④ | 관리자 화면 진입 | Orders + Order_Items + Menus 조회 → 주문 현황 표시 |
+| ⑤ | 관리자 상태 버튼 클릭 | Orders.status PATCH (주문 접수 → 제조 중 → 제조 완료) |
+| ⑥ | 관리자 재고 +/- 클릭 | Menus.stock PATCH |
+
+
+### 5.3 API 설계
+
+
+#### 5.3.1 메뉴 API
+
+**GET /api/menus** — 메뉴 목록 조회
+
+주문하기 화면 진입 시 호출. 각 메뉴의 옵션 목록을 함께 반환한다.
+
+- 요청: 없음
+- 응답 예시:
+```json
+[
+  {
+    "id": 1,
+    "name": "아메리카노(ICE)",
+    "description": "얼음이 가득한 시원한 아메리카노",
+    "price": 4000,
+    "image_url": null,
+    "stock": 10,
+    "options": [
+      { "id": 1, "name": "샷 추가", "price": 500 },
+      { "id": 2, "name": "시럽 추가", "price": 0 }
+    ]
+  }
+]
+```
+
+**PATCH /api/menus/:id/stock** — 재고 수량 수정
+
+관리자 화면에서 +/- 버튼 클릭 시 호출.
+
+- 요청 바디: `{ "stock": 9 }`
+- 응답: 수정된 메뉴 객체
+
+
+#### 5.3.2 주문 API
+
+**POST /api/orders** — 주문 생성
+
+장바구니의 주문하기 버튼 클릭 시 호출. 주문 저장과 동시에 해당 메뉴의 재고를 차감한다.
+
+- 요청 바디 예시:
+```json
+{
+  "items": [
+    {
+      "menu_id": 1,
+      "quantity": 2,
+      "option_ids": [1],
+      "item_price": 4500
+    }
+  ],
+  "total_price": 9000
+}
+```
+- 응답: 생성된 주문 객체 (id, status, created_at 포함)
+
+**GET /api/orders** — 주문 목록 조회
+
+관리자 화면 진입 시 호출. 최신 주문이 위에 오도록 내림차순 정렬.
+
+- 요청: 없음
+- 응답 예시:
+```json
+[
+  {
+    "id": 1,
+    "total_price": 9000,
+    "status": "주문 접수",
+    "created_at": "2026-06-29T13:00:00.000Z",
+    "items": [
+      {
+        "menu_name": "아메리카노(ICE)",
+        "quantity": 2,
+        "item_price": 4500,
+        "options": ["샷 추가"]
+      }
+    ]
+  }
+]
+```
+
+**GET /api/orders/:id** — 특정 주문 조회
+
+주문 ID를 전달하면 해당 주문의 상세 정보를 반환한다.
+
+- 요청: URL 파라미터 `id`
+- 응답: 단일 주문 객체 (items, options 포함)
+
+**PATCH /api/orders/:id/status** — 주문 상태 변경
+
+관리자 화면에서 상태 버튼 클릭 시 호출. 상태는 단방향으로만 전환된다.
+
+- 요청 바디: `{ "status": "제조 중" }`
+- 응답: 수정된 주문 객체
+- 오류: 유효하지 않은 상태 전환 시 400 반환
+
+
+### 5.4 예외 및 에러 처리
+
+| 상황 | HTTP 상태 코드 | 처리 방식 |
+|------|--------------|-----------|
+| 존재하지 않는 메뉴/주문 ID | 404 | `{ "error": "Not found" }` 반환 |
+| 재고 부족 상태로 주문 요청 | 409 | `{ "error": "재고가 부족합니다" }` 반환, 주문 미생성 |
+| 유효하지 않은 상태 전환 | 400 | `{ "error": "유효하지 않은 상태입니다" }` 반환 |
+| 필수 필드 누락 | 400 | `{ "error": "필수 항목이 누락되었습니다" }` 반환 |
+| 서버 내부 오류 | 500 | `{ "error": "서버 오류가 발생했습니다" }` 반환 |
